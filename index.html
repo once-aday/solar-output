@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset=utf-8 />
+    <title>Lab 08 Starter</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+
+    <script src="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.js"></script>
+
+    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.css" />
+    <link href='http://fonts.googleapis.com/css?family=Lato' rel='stylesheet' type='text/css'>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1f1f1f;
+            font-family: Lato, sans-serif;
+            color: #0D0000;
+        }
+        header {
+            padding: 6px 10%;
+            text-align: center;
+        }
+        h1 {
+            display: inline-block;
+            margin-right: 20px;
+            color: rgb(255, 166, 3);
+            text-shadow: 2px 2px #FF0000;
+
+        }
+        h2 {
+            display: inline-block;
+            color: rgb(255, 166, 3);
+            text-shadow: 2px .5px rgba(95, 95, 0, 0.29);
+        }
+        #map {
+            width: 100%;
+            height: 540px;
+            margin: 10px auto;
+        }
+        footer {
+            padding: 6px 10%;
+            width: 80%;
+        }
+        p {
+            font-size: 1em;
+            color: rgb(255, 166, 3);
+        }
+        .floating-box {
+            display: inline-block;
+            width: 120px;
+            height: 13px;
+            margin: 10px;
+            border: 6px groove rgb(239, 154, 0);
+            font-size: 11px;
+            font-family: "Lucida Console";
+            color: rgb(255, 216, 3);
+            text-shadow: 2px 1px #0D0000;
+            padding-top: 2px;
+        }
+        .legend {
+            line-height: 18px;
+            color: #555;
+            padding-right: 10px;
+            padding-left: 10px;
+            width: 150px;
+            height: 75px
+        }
+        .legend i {
+            width: 40px;
+            height: 30px;
+            float: left;
+            margin-right: 1px;
+            opacity: 0.7;
+            padding-bottom: 0px
+        }
+        .legend .circle {
+          border-radius: 50%;
+          width: 10px;
+          height: 10px;
+          margin-top: 8px;
+          margin-right: 10px;
+          padding-top: 0px
+
+        }
+        .info {
+            color: #a28537;
+            font-family: "Lucida Console";
+            line-height: 250%;
+        }
+        
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1><center>Solar Power Plants</center></h1>
+        <div class="floating-box">Energy Output Map</div>
+        <h2>Solar Energy Output as a Primary or a Seconday Fuel Source</h2>
+    </header>
+
+    <div id='map'></div>
+
+    <footer>
+        <p>Map authored by Devin Rocco</p>
+        <p>Data Source: <br>http://www.eia.gov/electricity/data/eia923/</p>
+    </footer>
+
+    <script src="power-plants.js"></script>
+    <script>
+
+      var map = L.map('map', {
+          center: [36,-97],
+          zoom: 4,
+          touchZoom: false,
+          scrollWheelZoom: false,
+      });
+      
+      var tiles = L.tileLayer('http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>',
+          subdomains: 'abcd',
+          maxZoom: 19
+      });  
+      
+      tiles.addTo(map);
+        
+        plants.features.sort(function(a, b) {
+            return b.properties.capacity_mw - a.properties.capacity_mw;
+        });
+
+        
+      var legend = L.control({position: 'bottomright'});
+
+        legend.onAdd = function (map) {
+
+            var div = L.DomUtil.create('div', 'info legend'),
+                grades = ["Solar Only", "Solar + Other"],
+                labels = [];
+
+            // loop through grades and label with a colored circle for each grade
+            
+            for (var i = 0; i < grades.length; i++) {
+                div.innerHTML +=
+                    '<i class="circle" i style="background:' + getColor(grades[i]) + '"></i> ' +
+                    grades[i] + (grades[i +1] ? '  ' + '  ' + '<br>' : '');
+            };
+
+            
+            return div;
+        };
+
+        legend.addTo(map);
+
+        
+        
+
+      L.geoJson(plants, {
+          pointToLayer: function(feature,latlng) {
+              return L.circleMarker(latlng, {
+                 color: feature.color,
+                 weight: 1,
+                 fillColor: feature.fillColor,
+                 fillOpacity: 0.8,
+                 radius: getRadius(feature.properties.capacity_mw)
+              });   
+          },
+          
+          
+          filter : function (feature, layer) {
+               if (feature.properties.fuel_source.Solar && Object.keys(feature.properties.fuel_source).length > 1) {
+                   return feature, feature.color = 'Orange', feature.fillColor = '#ff8c66';
+                } else if (feature.properties.fuel_source.Solar) {
+                   return feature, feature.color = 'Orange', feature.fillColor = 'Yellow';
+                };
+            },
+          
+          onEachFeature : function(feature,layer) {
+            
+            // Collect key names, e.g. power plant types, for each feature  
+            var keys = [];
+            for(var k in feature.properties.fuel_source) keys.push(k);
+              
+              
+            //  Create text for pop ups showing output of power plants; Supports up to two power plant types per popup window
+            if (keys.length > 1) {
+                var plant_out = "<b>" + keys[0] + ": </b>" + feature.properties.fuel_source[String(keys[0])] + " MW<br>" + "<b>" + keys[1] + ": </b>" + feature.properties.fuel_source[String(keys[1])] + " MW"               
+                
+            } else {
+                var plant_out = "<b>" + keys[0] + ": </b>" + feature.properties.fuel_source[String(keys[0])]  + " MW"
+            };
+                
+            var popupContent = "<b>" + feature.properties.plant_name + "</b><br>" +  "Capacity: " + feature.properties.capacity_mw + " MW" + "<br>" + plant_out;
+              
+            layer.bindPopup(popupContent)
+              
+            layer.on('mouseover', function() {
+                layer.setStyle({
+                    fillColor: 'red'
+                });
+            });
+            layer.on('mouseout', function() {
+                layer.setStyle({
+                    fillColor: feature.fillColor
+                });
+            });
+        }
+
+      }).addTo(map);
+
+          function getRadius(area) {
+                var radius = Math.sqrt(area/Math.PI);
+                return radius * .6;  
+            };
+        // Color legend items based on label name
+          function getColor(d) {
+                return d == 'Solar Only' ? 'Yellow' :
+                       d == 'Solar + Other'  ? '#ff8c66' :
+                                  '#FFEDA0';
+            };
+        
+        
+    </script>    
+</body>
+
+</html>
